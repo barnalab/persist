@@ -32,6 +32,9 @@ constructs.use$CDSlen=nchar(constructs.use$CDS.sequence)
 
 constructs.use$Experiment=factor(constructs.use$Experiment,levels=unique(constructs.use$Experiment)[c(3,2,1,4,11,9,10,7,5,6,8)]) #Group orders for plotting
 
+#Sequences
+constructs.use$RNA.sequence=unlist(lapply(strsplit(gsub("T","U",toupper(constructs.use$Full.sequence)),"UAAUACGACUCACUAUA"),"[[",2))
+
 #Counts table
 dat=data.frame(fread("./joined.txt",header=T))
 rownames(dat)=dat[,1]
@@ -57,7 +60,6 @@ weight_fraction_end=11
 #In-cell stability, long
 icstability_long_spikein=subset(samples,(Experiment=="stability")&(Spikein==1)&(Group=="In-cell")&(Type=="Long"))$index
 icstability_long_spikein_labels=samples[icstability_long_spikein,"Time"]
-
 dat.mat.icstability_long_spikein=dat.mat[,icstability_long_spikein]
 colnames(dat.mat.icstability_long_spikein)=icstability_long_spikein_labels
 
@@ -77,7 +79,7 @@ ID	Length	Conc	uM	dilution
 220023B1	882	996	3.32	10
 310333T3	953	1058	3.26	1
 '
-spikein_concs=c(3460,351,33.2)#,3.26)
+#spikein_concs=c(3460,351,33.2,3.26) #not using
 dat.mat.icstability_long_spikein.log2.scaled=dat.mat.icstability_long_spikein.log2
 for (i in 1:ncol(dat.mat.icstability_long_spikein.log2))
 {
@@ -98,7 +100,6 @@ icstability_long.fit.se=icstability_long.fit$stdev.unscaled*icstability_long.fit
 icstability_long.fit.upper=icstability_long.fit.coef+icstability_long.fit.se
 icstability_long.fit.lower=icstability_long.fit.coef-icstability_long.fit.se
 
-
 icstability_long.fit.coef.scale=icstability_long.fit.coef-matrix(apply(icstability_long.fit.coef,1,max),nrow=nrow(icstability_long.fit.coef),ncol=ncol(icstability_long.fit.coef),byrow=F)
 icstability_long.fit.upper.scale=icstability_long.fit.upper-matrix(apply(icstability_long.fit.upper,1,max),nrow=nrow(icstability_long.fit.upper),ncol=ncol(icstability_long.fit.upper),byrow=F)
 icstability_long.fit.lower.scale=icstability_long.fit.lower-matrix(apply(icstability_long.fit.lower,1,max),nrow=nrow(icstability_long.fit.lower),ncol=ncol(icstability_long.fit.lower),byrow=F)
@@ -112,18 +113,17 @@ icstability_long.fit.coef.scale.melt$totalcount=log2(rowSums(2^icstability_long.
 
 #Try to fit decay rate (of sorts) for ordering
 icstability_long.fit.coef.dr=list() 
-#Let's just take average since only 2 timepoints to fit
 for(i in rownames(icstability_long.fit.coef))
 {
-  #icstability_long.fit.coef.dr[i]=lm(icstability_long.fit.coef[i,1:3]~c(1,7,12))$coefficients[2] #Actual fitting (base 2)
+  #icstability_long.fit.coef.dr[i]=lm(icstability_long.fit.coef[i,1:3]~c(1,7,12))$coefficients[2] #Actual fitting with multiple time points (base 2)
   #ln N/No = -decay_rate*t
+  #Let's just take average since only 2 timepoints to fit
   decay_rate_6=-log(2^(icstability_long.fit.coef.scale[i,2]))/6
   decay_rate_11=-log(2^(icstability_long.fit.coef.scale[i,3]))/11
   decay_rate=mean(c(decay_rate_6,decay_rate_11))
   icstability_long.fit.coef.dr[i]=decay_rate
 }
 icstability_long.fit.coef.dr=unlist(icstability_long.fit.coef.dr)
-
 
 #Fraction of mRNA remainingrelative to time zero
 write.table(2^icstability_long.fit.coef.scale,file="./tables/long_spikein_incellstability_percent.tsv",row.names=T,col.names=T,quote=F,sep="\t")
@@ -163,7 +163,6 @@ v.fraction.scale=2^v.fraction$E/rowSums(2^v.fraction$E)
 rownames(v.fraction.scale)=rownames(v.fraction)
 colnames(v.fraction.scale)=colnames(v.fraction)
 
-#v.fraction.weights=c(0,0,0,1,1.75,2.75,3.5,4.5,5.75,7,8.5,10,12,14,17,20)[fraction_start:fraction_end]
 v.fraction.weights=c(0,0,0,1,1.5,2.5,3.5,4.5,5.5,7,8.5,10,12,14,17,20)[fraction_start:fraction_end]
 v.fraction.scale.weight=v.fraction.scale*matrix(v.fraction.weights,nrow=nrow(v.fraction.scale),ncol=ncol(v.fraction.scale),byrow=T)
 rownames(v.fraction.scale.weight)=rownames(v.fraction)
@@ -472,7 +471,6 @@ pdf("./plots/short_spikein_invitrostability_line.pdf",width=6,height=6)
 print(fig.ivstability.short.line)
 dev.off()
 
-
 #Load individual luciferase data and format them
 #Experiment 8
 luc_exp8_pest=read.csv("./exp8_nluc_pest.csv",header=T,sep="\t")
@@ -512,17 +510,36 @@ luc_joined.6.poly=melt(v.fraction.scale[luc_joined.6$construct.id,])
 luc_joined.6.poly$labels=constructs.use[as.character(luc_joined.6.poly$Var1),1]
 fig.luc.poly=ggplot(luc_joined.6.poly,aes(x=Var2,y=value,group=labels,colour=labels))+theme_classic()+geom_line()+scale_colour_iwanthue()
 
+'
 #differential equation system
 diff_func=function(t,state,params) {with(as.list(c(state,params)), {
   dmrna=(-deg_rate_mrna)*mrna
   dprot=translation*mrna-deg_rate_prot*prot
   list(c(dmrna,dprot))
 })}
-
+'
 #18+-11min NlucP; Nluc >6h (no degradation seen after 6h...)
-deg_rate_prot=log(2)/100000
+deg_rate_prot=log(2)/24
 #deg_rate_prot=log(2)/0.33
 
+tlists=list()
+num_ribosome=2
+inv_mrna_length=1/1000
+decay_rate_prot=deg_rate_prot
+for(timepoint in seq(0,64,2))
+{
+  rna_6h_fraction=seq(0,1,0.01)
+  rna=(-log(2^log2(rna_6h_fraction))/6)
+  tlists[[as.character(timepoint)]]=data.frame(rna_6h_fraction=rna_6h_fraction,prot=num_ribosome*inv_mrna_length/(decay_rate_prot-rna)*(exp(-rna*timepoint)-exp(-decay_rate_prot*timepoint)),time=timepoint)
+}
+tlists=do.call(rbind,tlists)
+
+pdf("./plots/rna_predicted.pdf",width=6,height=4)
+ggplot(tlists,aes(x=(rna_6h_fraction),y=prot,group=time,colour=time))+theme_classic()+geom_line()+geom_vline(alpha=0.33,xintercept=2^icstability_long.fit.coef.scale[intersect(subset(constructs.use,Designer=="Barna")$SequenceID,rownames(icstability_long.fit.coef.scale)),3])+scale_colour_viridis()+xlab("6h RNA fraction")+ylab("Predicted")
+dev.off()
+
+cz_prot_noribo_nolen=list()
+cz_prot_nolen=list()
 cz_prot_noribo=list()
 cz_prot=list()
 cz_mrna=list()
@@ -535,27 +552,53 @@ for(i in rownames(icstability_long.fit.coef))
   decay_rate_mrna=as.numeric(icstability_long.fit.coef.dr[i])
   decay_rate_prot=deg_rate_prot
   
+  #solution to diff equations from adele
+  #num_ribosome*inv_mrna_length/(decay_rate_prot-decay_rate_mrna)*(exp(-decay_rate_mrna*times)-exp(-decay_rate_prot*times))
+  
+  cz_prot[[i]]=num_ribosome*inv_mrna_length/(decay_rate_prot-decay_rate_mrna)*(exp(-decay_rate_mrna*times) -exp(-decay_rate_prot*times))
+  cz_prot_noribo[[i]]=1*inv_mrna_length/(decay_rate_prot-decay_rate_mrna)*(exp(-decay_rate_mrna*times)-exp(-decay_rate_prot*times))
+  cz_prot_nolen[[i]]=num_ribosome*1/(decay_rate_prot-decay_rate_mrna)*(exp(-decay_rate_mrna*times)-exp(-decay_rate_prot*times))
+  cz_prot_noribo_nolen[[i]]=1*1/(decay_rate_prot-decay_rate_mrna)*(exp(-decay_rate_mrna*times)-exp(-decay_rate_prot*times))
+  cz_mrna[[i]]=inv_mrna_length*exp(-decay_rate_mrna*times)
+  
+  '
+  #ode solver
   params=c(deg_rate_mrna=decay_rate_mrna,translation=num_ribosome,deg_rate_prot=decay_rate_prot)
   params_noribo=c(deg_rate_mrna=decay_rate_mrna,translation=1,deg_rate_prot=decay_rate_prot)
   state=c(mrna=inv_mrna_length,prot=0)
+  state_nolen=c(mrna=1,prot=0)
   
   solved=ode(y=state,times=times,func=diff_func,parms=params)
   solved_noribo=ode(y=state,times=times,func=diff_func,parms=params_noribo)
+  solved_nolen=ode(y=state_nolen,times=times,func=diff_func,parms=params)
+  solved_noribo_nolen=ode(y=state_nolen,times=times,func=diff_func,parms=params_noribo)
   
   cz_prot[[i]]=solved[,3]
   cz_prot_noribo[[i]]=solved_noribo[,3]
   cz_mrna[[i]]=solved[,2]
+  cz_prot_nolen[[i]]=solved_nolen[,3]
+  cz_prot_noribo_nolen[[i]]=solved_noribo_nolen[,3]
+  '
 }  
 
-cz_prot.mat=do.call(cbind,cz_prot)[,luc_joined.6$construct.id.np]
 cz_prot.all.mat=t(do.call(cbind,cz_prot))
 colnames(cz_prot.all.mat)=times
 cz_prot_noribo.all.mat=t(do.call(cbind,cz_prot_noribo))
 colnames(cz_prot_noribo.all.mat)=times
+cz_prot_nolen.all.mat=t(do.call(cbind,cz_prot_nolen))
+colnames(cz_prot_nolen.all.mat)=times
+cz_prot_noribo_nolen.all.mat=t(do.call(cbind,cz_prot_noribo_nolen))
+colnames(cz_prot_noribo_nolen.all.mat)=times
+
+cz_prot.mat=do.call(cbind,cz_prot)[,luc_joined.6$construct.id.np]
 cz_mrna.mat=do.call(cbind,cz_mrna)[,luc_joined.6$construct.id.np]
+cz_prot_noribo.mat=do.call(cbind,cz_prot_noribo)[,luc_joined.6$construct.id.np]
+
 cz.melt=melt(cz_prot.mat)
+cz.noribo.melt=melt(cz_prot_noribo.mat)
 cz.melt$mrna=melt(cz_mrna.mat)$value
 cz.melt$Var2=constructs.use[as.character(cz.melt$Var2),1]
+cz.melt$prot_noribo=cz.noribo.melt$value
 
 #Predicted expression vs time
 pdf("./plots/predicted_prot.pdf",width=8,height=6)
@@ -565,11 +608,12 @@ dev.off()
 #Predicted mRNA vs time
 pdf("./plots/predicted_mrna.pdf",width=8,height=6)
 ggplot(cz.melt,aes(x=times[Var1],y=mrna,group=Var2,colour=Var2))+theme_classic()+geom_line()+scale_colour_iwanthue()+ylab("Predicted mRNA")+xlab("Time")
-#dev.off()
+dev.off()
 
 #Predicted vs measured expression
 #luc_joined.6$pred=subset(cz.melt,Var1==which.max(apply(cz_prot.mat,1,cor,2^luc_joined.6$luc.mean_pest)))$value
 luc_joined.6$pred=subset(cz.melt,Var1==which.max(apply(cz_prot.mat,1,cor,2^luc_joined.6$luc.mean_exp7)))$value
+luc_joined.6$pred_noribo=subset(cz.melt,Var1==which.max(apply(cz_prot.mat,1,cor,2^luc_joined.6$luc.mean_exp7)))$prot_noribo
 #times[which.max(apply(cz_prot.mat,1,cor,2^luc_joined.6$luc.mean_pest))]
 #times[which.max(apply(cz_prot.mat,1,cor,2^luc_joined.6$luc.mean_exp7))]
 pdf("./plots/predicted_measured.pdf",width=8,height=6)
@@ -577,10 +621,15 @@ ggplot(subset(luc_joined.6),aes(y=2^luc.mean_exp7,x=(pred)))+theme_classic()+geo
 #ggplot(subset(luc_joined.6),aes(y=2^luc.mean_pest,x=(pred)))+theme_classic()+geom_point()+geom_text_repel(aes(label=construct))+xlab("Predicted")+ylab("Exp10 Nluc/Fluc")
 dev.off()
 
+pdf("./plots/predicted_measured_noribo.pdf",width=8,height=6)
+ggplot(subset(luc_joined.6),aes(y=2^luc.mean_exp7,x=(pred_noribo)))+theme_classic()+geom_point()+geom_text_repel(aes(label=construct))+xlab("Predicted")+ylab("Exp10 Nluc/Fluc")
+#ggplot(subset(luc_joined.6),aes(y=2^luc.mean_pest,x=(pred)))+theme_classic()+geom_point()+geom_text_repel(aes(label=construct))+xlab("Predicted")+ylab("Exp10 Nluc/Fluc")
+dev.off()
+
 luc_joined.24=subset(luc_joined,time==24)
 luc_joined.24$pred=subset(cz.melt,Var1==which.max(apply(cz_prot.mat,1,cor,2^luc_joined.24$luc.mean_exp7)))$value
 #luc_joined.24$pred=subset(cz.melt,Var1==which.max(apply(cz_prot.mat,1,cor,2^luc_joined.24$luc.mean_pest)))$value
-times[which.max(apply(cz_prot.mat,1,cor,2^luc_joined.24$luc.mean_exp7))]
+#times[which.max(apply(cz_prot.mat,1,cor,2^luc_joined.24$luc.mean_exp7))]
 #times[which.max(apply(cz_prot.mat,1,cor,2^luc_joined.24$luc.mean_pest))]
 #ggplot(subset(luc_joined.24),aes(y=2^luc.mean_exp7,x=(pred)))+theme_classic()+geom_point()+geom_text_repel(aes(label=construct))+xlab("Predicted")+ylab("Exp10 Nluc/Fluc")
 #ggplot(subset(luc_joined.24),aes(y=2^luc.mean_pest,x=(pred)))+theme_classic()+geom_point()+geom_text_repel(aes(label=construct))+xlab("Predicted")+ylab("Exp10 Nluc/Fluc")
@@ -595,12 +644,44 @@ luc_joined.12$pred=subset(cz.melt,Var1==which.max(apply(cz_prot.mat,1,cor,2^luc_
 plotids=rownames(v.fraction.scale)
 
 #Predicted prots
-cz.plot=data.frame(ids=names(cz_prot),pred=cz_prot.all.mat[,ncol(cz_prot.all.mat)],noribo_pred=cz_prot_noribo.all.mat[,ncol(cz_prot_noribo.all.mat)])
+cz.plot=data.frame(ids=names(cz_prot),pred=cz_prot_nolen.all.mat[,ncol(cz_prot_nolen.all.mat)],noribo_pred=cz_prot_noribo_nolen.all.mat[,ncol(cz_prot_noribo_nolen.all.mat)])
 cz.plot$pred.use=cz.plot$pred
 cz.plot[intersect(subset(constructs.use,!Designer=="Barna")$SequenceID,cz.plot$ids),"pred.use"]=cz.plot[intersect(subset(constructs.use,!Designer=="Barna")$SequenceID,cz.plot$ids),"noribo_pred"]
 
 cz.plot.missing=plotids[!plotids%in%rownames(cz.plot)]
 cz.plot=rbind(cz.plot,data.frame(ids=cz.plot.missing,pred=NA,noribo_pred=NA,pred.use=NA))
+
+
+#Paired-unpaired
+punp=as.matrix(fread("./P_UNP_232x.txt",header=F,fill=T))
+punp.seq=gsub("T","U",toupper(data.frame(fread("./RNASEQUENCES_232x.txt",header=F))[,1]))
+rownames(punp)=constructs.use[match(punp.seq,constructs.use$RNA.sequence),]$SequenceID
+punp.seq.dna=DNAStringSet(gsub("U","T",punp.seq))
+names(punp.seq.dna)=rownames(punp)
+
+#From stop codon of longest ORF
+punp.seq.orfs=as.data.frame(systemPipeR::predORF(punp.seq.dna,1,longest_disjoint=T))
+punp.seq.orfs$end
+rownames(punp.seq.orfs)=punp.seq.orfs$seqnames
+
+colnames(punp)=1:ncol(punp)
+punp.melt=melt(punp)
+colnames(punp.melt)=c("id","pos","punp")
+punp.melt$posfromend=punp.melt$pos-punp.seq.orfs[as.character(punp.melt$id),"end"]
+
+punp.melt.missing=plotids[!plotids%in%punp.melt$id]
+punp.melt=rbind(punp.melt,data.frame(id=punp.melt.missing,pos=NA,punp=NA,posfromend=NA))
+punp.melt=subset(punp.melt,!is.na(punp))
+
+punp.melt$labels=factor(constructs.use[as.character(punp.melt$id),1],levels=constructs.use[plotids,1])
+fig.punp=ggplot(punp.melt,aes(x=posfromend,y=labels,colour=punp,fill=punp))+theme_classic()+geom_tile()+xlab("Punp")+ylab("")+theme(axis.text.y=element_blank(),axis.line.y=element_blank(),axis.ticks.y=element_blank(),legend.position="bottom")+scale_fill_viridis(option="magma",oob=squish,na.value="darkgrey",name="Punp")+scale_colour_viridis(option="magma",oob=squish,na.value="darkgrey",name="Punp")
+
+punp.sum=data.frame(id=rownames(punp),sum=rowSums(punp,na.rm=T)/nchar(punp.seq.dna[rownames(punp)]))
+punp.sum.missing=plotids[!plotids%in%punp.sum$id]
+punp.sum=rbind(punp.sum,data.frame(id=punp.sum.missing,sum=NA))
+
+punp.sum$labels=factor(constructs.use[as.character(punp.sum$id),1],levels=constructs.use[plotids,1])
+fig.punp.sum.plot=ggplot(punp.sum,aes(y=labels,x=sum))+theme_classic()+geom_bar(stat="identity",fill="black")+scale_x_continuous(expand=c(0,0))+ylab("")+xlab("P-up sum")+theme(legend.position="bottom",axis.text.y=element_blank(),axis.line.y=element_blank(),axis.ticks.y=element_blank())
 
 plotids.ordered=NULL
 plotids.groups=levels(constructs.use$Experiment)
@@ -611,17 +692,22 @@ for (group in plotids.groups)
   group_seqid=subset(constructs.use[plotids,],Experiment==group)$SequenceID
   
   #Order by polysome hclust
-  #group_order=hclust(dist(v.fraction.scale[group_seqid,]),"average")$order
+  group_order=hclust(dist(v.fraction.scale[group_seqid,]),"average")$order
   
   #Order by in vitro stability
-  #group_seqid_use=intersect(rownames(ivstability_long.fit.coef.scale),group_seqid)
+  #group_seqid_use=intersect(names(ivstability_long.fit.coef.dr),group_seqid)
   #group_order=rep(NA,length(group_seqid))
   #names(group_order)=group_seqid
-  #group_order[group_seqid_use]=order(rowMeans(apply(ivstability_long.fit.coef.scale[,2:6],2,rank))[group_seqid_use])
   #group_order[group_seqid_use]=order(ivstability_long.fit.coef.dr[group_seqid_use])
   
+  #Order by in cell stability
+  #group_seqid_use=intersect(names(icstability_long.fit.coef.dr),group_seqid)
+  #group_order=rep(NA,length(group_seqid))
+  #names(group_order)=group_seqid
+  #group_order[group_seqid_use]=order(icstability_long.fit.coef.dr[group_seqid_use])
+  
   #Order by predicted
-  group_order=order(cz.plot[group_seqid,"pred.use"],decreasing=T)
+  #group_order=order(cz.plot[group_seqid,"pred.use"],decreasing=T)
   
   group_seqid=rev(group_seqid[group_order])
   plotids.ordered=c(plotids.ordered,group_seqid)
@@ -629,19 +715,21 @@ for (group in plotids.groups)
 plotids=plotids.ordered
 plotids=plotids[!is.na(plotids)]
 
+#in-cell stability decay rate plot
 icstability_long.fit.dr.plot=data.frame(id=plotids,labels=constructs.use[plotids,1],value=icstability_long.fit.coef.dr[plotids])
 icstability_long.fit.dr.plot$id=factor(as.character(icstability_long.fit.dr.plot$id),levels=plotids)
 icstability_long.fit.dr.plot$labels=factor(icstability_long.fit.dr.plot$labels,levels=constructs.use[plotids,1])
 
 fig.icstability.long.plot=ggplot(icstability_long.fit.dr.plot,aes(y=labels,x=value))+theme_classic()+geom_bar(stat="identity",fill="black")+scale_x_continuous(expand=c(0,0))+ylab("")+xlab("In-cell\nRNA decay")+theme(legend.position="bottom",axis.text.y=element_blank(),axis.line.y=element_blank(),axis.ticks.y=element_blank())
 
+#in-vitro stability decay rate plot
 ivstability_long.fit.dr.plot=data.frame(id=plotids,labels=constructs.use[plotids,1],value=ivstability_long.fit.coef.dr[plotids])
 ivstability_long.fit.dr.plot$id=factor(as.character(ivstability_long.fit.dr.plot$id),levels=plotids)
 ivstability_long.fit.dr.plot$labels=factor(ivstability_long.fit.dr.plot$labels,levels=constructs.use[plotids,1])
 
 fig.ivstability.long.plot=ggplot(ivstability_long.fit.dr.plot,aes(y=labels,x=value))+theme_classic()+geom_bar(stat="identity",fill="black")+scale_x_continuous(expand=c(0,0))+ylab("")+xlab("In-vitro\nRNA decay")+theme(legend.position="bottom",axis.text.y=element_blank(),axis.line.y=element_blank(),axis.ticks.y=element_blank())
 
-
+#ribosome number plot
 v.fraction.scale.weight.tr.plot=data.frame(id=plotids,labels=constructs.use[plotids,1],value=rowSums(v.fraction.scale.weight)[plotids])
 v.fraction.scale.weight.tr.plot$value=v.fraction.scale.weight.tr.plot$value-min(v.fraction.scale.weight.tr.plot$value,na.rm=T)
 v.fraction.scale.weight.tr.plot$id=factor(as.character(v.fraction.scale.weight.tr.plot$id),levels=plotids)
@@ -649,22 +737,26 @@ v.fraction.scale.weight.tr.plot$labels=factor(v.fraction.scale.weight.tr.plot$la
 
 fig.fraction.tr.plot=ggplot(v.fraction.scale.weight.tr.plot,aes(y=labels,x=value))+theme_classic()+geom_bar(stat="identity",fill="black")+scale_x_continuous(expand=c(0,0))+ylab("")+xlab("Ribo number\n(-min)")+theme(legend.position="bottom",axis.text.y=element_blank(),axis.line.y=element_blank(),axis.ticks.y=element_blank())
 
+#predicted plot
 cz.plot$labels=factor(constructs.use[cz.plot$ids,1],levels=constructs.use[plotids,1])
 
 fig.cz.plot=ggplot(cz.plot,aes(y=labels,x=pred.use))+theme_classic()+geom_bar(stat="identity",fill="black")+scale_x_continuous(expand=c(0,0))+ylab("")+xlab("Predicted")+theme(legend.position="bottom",axis.text.y=element_blank(),axis.line.y=element_blank(),axis.ticks.y=element_blank())
 
+#in vitro stability heatmap
 ivstability_long.fit.coef.scale.melt.plot=subset(ivstability_long.fit.coef.scale.melt,as.character(id)%in%plotids)
 ivstability_long.fit.coef.scale.melt.plot$id=factor(as.character(ivstability_long.fit.coef.scale.melt.plot$id),levels=plotids)
 ivstability_long.fit.coef.scale.melt.plot=ivstability_long.fit.coef.scale.melt.plot[!is.na(ivstability_long.fit.coef.scale.melt.plot$id),]
 
+#Fill missing values
 ivstability_long.fit.coef.scale.melt.plot.missing=plotids[!plotids%in%unique(as.character(ivstability_long.fit.coef.scale.melt.plot$id))]
-ivstability_long.fit.coef.scale.melt.plot=rbind(ivstability_long.fit.coef.scale.melt.plot,data.frame(id=rep(ivstability_long.fit.coef.scale.melt.plot.missing,each=length(levels(ivstability_long.fit.coef.scale.melt.plot$time))),time=rep(levels(ivstability_long.fit.coef.scale.melt.plot$time),length(ivstability_long.fit.coef.scale.melt.plot.missing)),value=NA,upper=NA,lower=NA))
+ivstability_long.fit.coef.scale.melt.plot=rbind(ivstability_long.fit.coef.scale.melt.plot,data.frame(id=rep(ivstability_long.fit.coef.scale.melt.plot.missing,each=length(levels(ivstability_long.fit.coef.scale.melt.plot$time))),time=rep(levels(ivstability_long.fit.coef.scale.melt.plot$time),length(ivstability_long.fit.coef.scale.melt.plot.missing)),value=NA,upper=NA,lower=NA,totalcount=NA))
 
 ivstability_long.fit.coef.scale.melt.plot$labels=factor(constructs.use[as.character(ivstability_long.fit.coef.scale.melt.plot$id),1],levels=constructs.use[plotids,1])
 levels(ivstability_long.fit.coef.scale.melt.plot$time)=as.character(c(0,0.5,1,2,3,4,5,6,16,24))
 
 fig.ivstability.long.scale.plot=ggplot(subset(ivstability_long.fit.coef.scale.melt.plot),aes(x=time,y=labels,fill=(value),colour=(value)))+theme_classic()+geom_tile()+scale_fill_viridis(option="magma",oob=squish,na.value="darkgrey",name="% mRNA")+scale_colour_viridis(option="magma",oob=squish,na.value="darkgrey",name="% mRNA")+xlab("Time")+ylab("")+theme(axis.text.y=element_blank(),axis.line.y=element_blank(),axis.ticks.y=element_blank(),legend.position="bottom")
 
+#Polysomes heatmap, %mRNA
 v.fraction.scale.melt.plot=subset(v.fraction.scale.melt,as.character(id)%in%plotids)
 v.fraction.scale.melt.plot$id=factor(as.character(v.fraction.scale.melt.plot$id),levels=plotids)
 v.fraction.scale.melt.plot=v.fraction.scale.melt.plot[!is.na(v.fraction.scale.melt.plot$id),]
@@ -672,6 +764,7 @@ v.fraction.scale.melt.plot$labels=factor(constructs.use[as.character(v.fraction.
 
 fig.fraction.plot=ggplot(subset(v.fraction.scale.melt.plot,fraction%in%c(2:11)),aes(x=fraction,y=labels,fill=(value),colour=(value)))+theme_classic()+geom_tile()+scale_fill_viridis(option="magma",oob=squish,na.value="darkgrey",name="% mRNA")+scale_colour_viridis(option="magma",oob=squish,na.value="darkgrey",name="% mRNA")+xlab("Fractions 2-11")+ylab("")+theme(axis.text.y=element_blank(),axis.line.y=element_blank(),axis.ticks.y=element_blank(),legend.position="bottom")
 
+#Polysomes heatmap, weighted %mRNA
 v.fraction.scale.weight.melt.plot=subset(v.fraction.scale.weight.melt,as.character(id)%in%plotids)
 v.fraction.scale.weight.melt.plot$id=factor(as.character(v.fraction.scale.weight.melt.plot$id),levels=levels(v.fraction.scale.weight.melt$id)[levels(v.fraction.scale.weight.melt$id)%in%plotids])
 v.fraction.scale.weight.melt.plot=v.fraction.scale.weight.melt.plot[!is.na(v.fraction.scale.weight.melt.plot$id),]
@@ -679,7 +772,7 @@ v.fraction.scale.weight.melt.plot$labels=factor(constructs.use[as.character(v.fr
 
 fig.fraction.weight.plot=ggplot(subset(v.fraction.scale.weight.melt.plot,fraction%in%c(2:11)),aes(x=fraction,y=labels,fill=(value),colour=(value)))+theme_classic()+geom_tile()+scale_fill_viridis(option="magma",oob=squish,na.value="darkgrey",name="Weighted % mRNA")+scale_colour_viridis(option="magma",oob=squish,na.value="darkgrey",name="Weighted % mRNA")+xlab("Fractions 2-11")+ylab("")+theme(axis.text.y=element_blank(),axis.line.y=element_blank(),axis.ticks.y=element_blank(),legend.position="bottom")
 
-
+#Polysomes heatmap, z-scaled
 v.fraction.zscale.melt.plot=subset(v.fraction.zscale.melt,as.character(id)%in%plotids)
 v.fraction.zscale.melt.plot$id=factor(as.character(v.fraction.zscale.melt.plot$id),levels=levels(v.fraction.zscale.melt$id)[levels(v.fraction.zscale.melt$id)%in%plotids])
 v.fraction.zscale.melt.plot=v.fraction.zscale.melt.plot[!is.na(v.fraction.zscale.melt.plot$id),]
@@ -698,14 +791,15 @@ fig.panel=cowplot::plot_grid(
   fig.fraction.plot,
   fig.fraction.weight.plot,
   fig.fraction.zscale.plot,
+  fig.punp,
+  fig.punp.sum.plot,
   fig.ivstability.long.scale.plot,
   fig.ivstability.long.plot,
   fig.icstability.long.plot,
   fig.fraction.tr.plot,
   fig.cz.plot,
-  ncol=9,nrow=1,align="hv",axis="tbr",rel_widths=c(0.45,0.3,0.3,0.3,0.3,0.1,0.1,0.1,0.1))
+  ncol=11,nrow=1,align="hv",axis="tbr",rel_widths=c(0.45,0.3,0.3,0.3,1.2,0.1,0.3,0.1,0.1,0.1,0.1))
 
-pdf("./plots/data_panel_pred.pdf",width=36,height=24)
+pdf("./plots/data_panel_pred.pdf",width=55,height=24)
 print(fig.panel)
 dev.off()
-
