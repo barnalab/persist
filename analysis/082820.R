@@ -29,10 +29,9 @@ constructs.use$Experiment[constructs.use$Experiment=="vary5UTR_NlucP_HBA1"]="Nlu
 constructs.use$Experiment[constructs.use$Experiment=="vary5UTR_NlucP_HBB"]="NlucP"
 
 constructs.use$CDSlen=nchar(constructs.use$CDS.sequence)
-
 constructs.use$Experiment=factor(constructs.use$Experiment,levels=unique(constructs.use$Experiment)[c(3,2,1,4,11,9,10,7,5,6,8)]) #Group orders for plotting
 
-#Sequences
+#T7 sequence
 constructs.use$RNA.sequence=unlist(lapply(strsplit(gsub("T","U",toupper(constructs.use$Full.sequence)),"UAAUACGACUCACUAUA"),"[[",2))
 
 #Counts table
@@ -52,11 +51,6 @@ rownames(samples)=samples$index
 spikeins=subset(constructs.use,Barcode.Amplicon.Sequencing.2=="spike-in")$SequenceID
 usespikeins=spikeins[1:3]
 
-#Remove fraction 1, up to fraction 11 for sum
-fraction_start=2
-fraction_end=16
-weight_fraction_end=11
-
 #In-cell stability, long
 icstability_long_spikein=subset(samples,(Experiment=="stability")&(Spikein==1)&(Group=="In-cell")&(Type=="Long"))$index
 icstability_long_spikein_labels=samples[icstability_long_spikein,"Time"]
@@ -73,6 +67,7 @@ colnames(icstability_long.design)=unlist(lapply(strsplit(colnames(icstability_lo
 
 #Spike-in log linear fit
 '
+#If using actual conc for standard
 ID	Length	Conc	uM	dilution
 120002B1	897	1057	3.46	1000
 120010B1	897	1071	3.51	100
@@ -86,7 +81,7 @@ for (i in 1:ncol(dat.mat.icstability_long_spikein.log2))
   spikeinfit=lm(dat.mat.icstability_long_spikein.log2[usespikeins,c(1,i)])
   dat.mat.icstability_long_spikein.log2.scaled[,i]=predict.lm(spikeinfit,newdata=dat.mat.icstability_long_spikein.log2[,c(1,i)])
   
-  #Using actual amounts
+  #Using actual amounts as standard
   #spikeinfit=lm(data.frame(std=log2(spikein_concs),dat=dat.mat.icstability_long_spikein.log2[usespikeins,i]))
   #dat.mat.icstability_long_spikein.log2.scaled[,i]=predict.lm(spikeinfit,newdata=data.frame(dat=dat.mat.icstability_long_spikein.log2[,c(i)]))
 }
@@ -94,9 +89,10 @@ for (i in 1:ncol(dat.mat.icstability_long_spikein.log2))
 rownames(dat.mat.icstability_long_spikein.log2.scaled)=rownames(dat.mat.icstability_long_spikein.log2)
 v.icstability_long=voom(2^(dat.mat.icstability_long_spikein.log2.scaled[!rownames(dat.mat.icstability_long_spikein.log2.scaled)%in%spikeins,]),icstability_long.design,lib.size=rep(1,15))
 
+#Use lmfit for rep's
 icstability_long.fit=lmFit(v.icstability_long,icstability_long.design)
 icstability_long.fit.coef=icstability_long.fit$coefficients
-icstability_long.fit.se=icstability_long.fit$stdev.unscaled*icstability_long.fit$sigma
+icstability_long.fit.se=icstability_long.fit$stdev.unscaled*icstability_long.fit$sigma #standard error from reg.
 icstability_long.fit.upper=icstability_long.fit.coef+icstability_long.fit.se
 icstability_long.fit.lower=icstability_long.fit.coef-icstability_long.fit.se
 
@@ -117,6 +113,7 @@ for(i in rownames(icstability_long.fit.coef))
 {
   #icstability_long.fit.coef.dr[i]=lm(icstability_long.fit.coef[i,1:3]~c(1,7,12))$coefficients[2] #Actual fitting with multiple time points (base 2)
   #ln N/No = -decay_rate*t
+  
   #Let's just take average since only 2 timepoints to fit
   decay_rate_6=-log(2^(icstability_long.fit.coef.scale[i,2]))/6
   decay_rate_11=-log(2^(icstability_long.fit.coef.scale[i,3]))/11
@@ -143,6 +140,12 @@ print(fig.icstability.long.line)
 dev.off()
 
 #Fractions
+
+#Remove fraction 1, up to fraction 11 for sum
+fraction_start=2
+fraction_end=16
+weight_fraction_end=11
+
 fraction_spikein=subset(samples,(Experiment=="polysomes")&(Spikein==1))$index
 fraction_spikein_labels=samples[fraction_spikein,"Fraction"]
 
@@ -163,12 +166,13 @@ v.fraction.scale=2^v.fraction$E/rowSums(2^v.fraction$E)
 rownames(v.fraction.scale)=rownames(v.fraction)
 colnames(v.fraction.scale)=colnames(v.fraction)
 
+#Weights for each fraction (# ribosome)
 v.fraction.weights=c(0,0,0,1,1.5,2.5,3.5,4.5,5.5,7,8.5,10,12,14,17,20)[fraction_start:fraction_end]
 v.fraction.scale.weight=v.fraction.scale*matrix(v.fraction.weights,nrow=nrow(v.fraction.scale),ncol=ncol(v.fraction.scale),byrow=T)
 rownames(v.fraction.scale.weight)=rownames(v.fraction)
 colnames(v.fraction.scale.weight)=colnames(v.fraction)
 
-#v.fraction.group.zscale
+#Group by CDS length for z-scaling
 counts.scale.list=list()
 for(cdslen in constructs.use[rownames(v.fraction.scale),"CDSlen"])
 {
@@ -384,6 +388,7 @@ ivstability_long.fit.coef.dr=list()
 ivstability_long.fit.coef.init=list()
 for(i in rownames(ivstability_long.fit.coef))
 {
+  #Using 1,2,3,4 hrs only for decay rate constant fit
   ivstability_long.fit.coef.dr.fit=lm(log(2^ivstability_long.fit.coef[i,3:6])~c(0,0.5,1,2,3,4,5,6,16,24)[3:6])
   ivstability_long.fit.coef.dr[i]=(-(ivstability_long.fit.coef.dr.fit$coefficients[2]))
   ivstability_long.fit.coef.init[i]=(ivstability_long.fit.coef.dr.fit$coefficients[1])
@@ -508,7 +513,11 @@ luc_joined.6$length=constructs.use[luc_joined.6$construct.id,"Length.to.order"]
 
 luc_joined.6.poly=melt(v.fraction.scale[luc_joined.6$construct.id,])
 luc_joined.6.poly$labels=constructs.use[as.character(luc_joined.6.poly$Var1),1]
-fig.luc.poly=ggplot(luc_joined.6.poly,aes(x=Var2,y=value,group=labels,colour=labels))+theme_classic()+geom_line()+scale_colour_iwanthue()
+luc_joined.6.poly$weighted_ribosomes=rowSums(v.fraction.scale.weight)[luc_joined.6$construct.id]
+
+#Check weighted ribosomes number behaving as expected
+#fig.luc.poly=ggplot(luc_joined.6.poly,aes(x=Var2,y=value,group=labels,colour=labels))+theme_classic()+geom_line()+scale_colour_iwanthue()
+fig.luc.poly=ggplot(luc_joined.6.poly,aes(x=Var2,y=value,group=labels,colour=weighted_ribosomes))+theme_classic()+geom_line()+scale_colour_viridis(option="magma")
 
 '
 #differential equation system
@@ -522,20 +531,24 @@ diff_func=function(t,state,params) {with(as.list(c(state,params)), {
 deg_rate_prot=log(2)/24
 #deg_rate_prot=log(2)/0.33
 
+#See what varying RNA amounts measured at one timepoint for decay rate do to predicted protein expression
 tlists=list()
 num_ribosome=2
 inv_mrna_length=1/1000
-decay_rate_prot=deg_rate_prot
-for(timepoint in seq(0,64,2))
+for(timepoint in seq(1,64,1))
 {
-  rna_6h_fraction=seq(0,1,0.01)
-  rna=(-log(2^log2(rna_6h_fraction))/6)
-  tlists[[as.character(timepoint)]]=data.frame(rna_6h_fraction=rna_6h_fraction,prot=num_ribosome*inv_mrna_length/(decay_rate_prot-rna)*(exp(-rna*timepoint)-exp(-decay_rate_prot*timepoint)),time=timepoint)
+  for(prot_halflife in 0.05*2^(1:10))
+  {
+    rna_6h_fraction=seq(0,1,0.01)
+    rna=(-log(2^log2(rna_6h_fraction))/6)
+    decay_rate_prot=log(2)/prot_halflife
+    tlists[[paste(timepoint,prot_halflife)]]=data.frame(rna_6h_fraction=rna_6h_fraction,prot=num_ribosome*inv_mrna_length/(decay_rate_prot-rna)*(exp(-rna*timepoint)-exp(-decay_rate_prot*timepoint)),time=timepoint,prot_halflife=prot_halflife)
+  }
 }
 tlists=do.call(rbind,tlists)
 
 pdf("./plots/rna_predicted.pdf",width=6,height=4)
-ggplot(tlists,aes(x=(rna_6h_fraction),y=prot,group=time,colour=time))+theme_classic()+geom_line()+geom_vline(alpha=0.33,xintercept=2^icstability_long.fit.coef.scale[intersect(subset(constructs.use,Designer=="Barna")$SequenceID,rownames(icstability_long.fit.coef.scale)),3])+scale_colour_viridis()+xlab("6h RNA fraction")+ylab("Predicted")
+ggplot(subset(tlists,time==36)%>%group_by(prot_halflife)%>%mutate(prot_rel=prot/max(prot)),aes(x=(rna_6h_fraction),y=prot_rel,group=prot_halflife,colour=prot_halflife))+theme_classic()+geom_line()+geom_vline(alpha=0.33,xintercept=2^icstability_long.fit.coef.scale[intersect(subset(constructs.use,Designer=="Barna")$SequenceID,rownames(icstability_long.fit.coef.scale)),3])+scale_colour_viridis()+xlab("RNA fraction")+ylab("Predicted")
 dev.off()
 
 cz_prot_noribo_nolen=list()
