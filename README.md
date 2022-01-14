@@ -29,6 +29,6 @@ analysis/samples.csv: sample sheet
 ## Description  
 1. counts_pipeline/p1.sh + join.sh: generates counts matrix (constructs x samples)  
 2. analysis/persist_p.R: does a number of things from the sequencing data  
--calculates weighted ribosome number
--fits in-cell stability degradation coefficients
+-calculates weighted ribosome number  
+-fits in-cell stability degradation coefficients  
 -using these two values, estimates expected protein levels according to kinetic model in the manuscript  
