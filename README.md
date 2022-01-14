@@ -1,10 +1,10 @@
-# openvaccine: PERSIST-seq pipeline  
+# openvaccine: PERSIST-seq
 
 This repo accompanies the following manuscript:  
 
 Combinatorial optimization of mRNA structure, stability, and translation for RNA-based therapeutics  
 
-Kathrin Leppek1*, Gun Woo Byeon1*, Wipapat Kladwang2*, Hannah K. Wayment-Steele3*, Craig H. Kerr1*, Adele F. Xu1**, Do Soon Kim2**, Ved V. Topkar4, Christian Choe5, Daphna Rothschild1, Gerald C. Tiu1, Roger Wellington-Oguri6, Kotaro Fujii1, Eesha Sharma2, Andrew M. Watkins2, John J. Nicol6, Jonathan Romano6,7, Bojan Tunguz2,8, Fernando Diaz9, Hui Cai9, Pengbo Guo9, Jiewei Wu9, Fanyu Meng9, Shuai Shi9, Eterna Participants6, Philip R. Dormitzer9, Alicia Solórzano9, Maria Barna1‡, Rhiju Das2‡  
+Kathrin Leppek, Gun Woo Byeon, Wipapat Kladwang, Hannah K. Wayment-Steele, Craig H. Kerr, Adele F. Xu, Do Soon Kim, Ved V. Topkar, Christian Choe, Daphna Rothschild, Gerald C. Tiu, Roger Wellington-Oguri, Kotaro Fujii, Eesha Sharma, Andrew M. Watkins, John J. Nicol, Jonathan Romano, Bojan Tunguz, Fernando Diaz, Hui Cai, Pengbo Guo, Jiewei Wu, Fanyu Meng, Shuai Shi, Eterna Participants, Philip R. Dormitzer, Alicia Solórzano, Maria Barna, Rhiju Das  
 
 It contains the code used to process PERSIST-seq data in the manuscript.  
 
@@ -14,6 +14,9 @@ It contains the code used to process PERSIST-seq data in the manuscript.
 [bowtie2](https://github.com/BenLangmead/bowtie2)  
 [samtools](https://github.com/samtools)  
 [UMIcollapse](https://github.com/Daniel-Liu-c0deb0t/UMICollapse)  
+[R](https://www.r-project.org/)
+[errors](https://cran.r-project.org/web/packages/errors/index.html)
+[limma](https://bioconductor.org/packages/release/bioc/html/limma.html)  
 
 
 ## Inputs
