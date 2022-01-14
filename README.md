@@ -19,11 +19,11 @@ It contains the code used to process PERSIST-seq data in the manuscript.
 [limma](https://bioconductor.org/packages/release/bioc/html/limma.html)  
 
 
-## Inputs
+## Inputs  
 Sequencing reads deposited in GEO: [GSE173083](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE173083)  
-counts_pipeline/index/233pool.fa: FASTA containing barcode sequences for each template ID
-analysis/constructs.tsv: synthetic mRNA design constructs
-analysis/samples.csv: sample sheet
+counts_pipeline/index/233pool.fa: FASTA containing barcode sequences for each template ID  
+analysis/constructs.tsv: synthetic mRNA design constructs  
+analysis/samples.csv: sample sheet  
 
 
 ## Description  
