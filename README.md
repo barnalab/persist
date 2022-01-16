@@ -14,8 +14,8 @@ It contains the code used to process PERSIST-seq data in the manuscript.
 [bowtie2](https://github.com/BenLangmead/bowtie2)  
 [samtools](https://github.com/samtools)  
 [UMIcollapse](https://github.com/Daniel-Liu-c0deb0t/UMICollapse)  
-[R](https://www.r-project.org/)
-[errors](https://cran.r-project.org/web/packages/errors/index.html)
+[R](https://www.r-project.org/)  
+[errors](https://cran.r-project.org/web/packages/errors/index.html)  
 [limma](https://bioconductor.org/packages/release/bioc/html/limma.html)  
 
 
