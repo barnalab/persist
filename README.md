@@ -32,3 +32,4 @@ analysis/samples.csv: sample sheet
 -calculates weighted ribosome number  
 -fits in-cell stability degradation coefficients  
 -using these two values, estimates expected protein levels according to kinetic model in the manuscript  
+3. [analysis/persist\_seq\_in\_solution\_matlab](analysis/persist_seq_in_solution_matlab): MATLAB scripts, input/output files for exponential fits and non-parameteric bootstrapping of in-solution stabilities.  
